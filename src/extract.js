@@ -2,6 +2,8 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const zlib = require('node:zlib');
+const { Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const yauzl = require('yauzl');
 const {
@@ -111,10 +113,43 @@ function resolveContained(destDir, entryName) {
 
 function openZip(archivePath) {
   return new Promise((resolve, reject) => {
-    yauzl.open(archivePath, { lazyEntries: true, validateEntrySizes: true }, (err, zipfile) => {
-      if (err) return reject(new CorruptArchiveError(archivePath, err.message));
-      resolve(zipfile);
-    });
+    yauzl.open(
+      archivePath,
+      { lazyEntries: true, validateEntrySizes: true, strictFileNames: true },
+      (err, zipfile) => {
+        if (err) return reject(new CorruptArchiveError(archivePath, err.message));
+        resolve(zipfile);
+      },
+    );
+  });
+}
+
+// yauzl (and its `validateEntrySizes` option) checks the extracted byte
+// *count* against the entry's recorded size, but explicitly does not check
+// the extracted bytes' CRC32 against the entry's recorded crc32 (see its
+// README's "No CRC-32 checking" section) -- so a same-length payload whose
+// bytes were corrupted in transit or on disk would otherwise pass silently.
+// This computes the CRC32 of the bytes as they stream through, and fails
+// the archive if it doesn't match the entry's declared crc32 once the
+// stream ends -- independent of, and in addition to, yauzl's own size check.
+function crcVerifyTransform(entry, archivePath) {
+  let crc = 0;
+  return new Transform({
+    transform(chunk, _enc, callback) {
+      crc = zlib.crc32(chunk, crc);
+      callback(null, chunk);
+    },
+    flush(callback) {
+      if (crc !== entry.crc32) {
+        return callback(
+          new CorruptArchiveError(
+            archivePath,
+            `CRC32 mismatch for "${entry.fileName}": expected ${entry.crc32.toString(16)}, got ${crc.toString(16)}`,
+          ),
+        );
+      }
+      callback();
+    },
   });
 }
 
@@ -157,12 +192,13 @@ async function extractArchive(archivePath, destDir) {
 
     zipfile.on('error', (err) => {
       // yauzl validates each entry's own fileName before emitting 'entry'
-      // and reports an unsafe one (absolute, or containing "..") through
-      // this same generic error event, auto-closing the zipfile -- so an
-      // unsafe path can surface here instead of from assertSafeEntryName
-      // below. Distinguish it from an actually-corrupt archive by message,
-      // since yauzl does not give these a distinct error type.
-      const unsafePathPattern = /^(absolute path|invalid relative path): /;
+      // and reports an unsafe one (absolute, containing "..", or -- with
+      // strictFileNames:true -- containing a backslash) through this same
+      // generic error event, auto-closing the zipfile -- so an unsafe path
+      // can surface here instead of from assertSafeEntryName below.
+      // Distinguish it from an actually-corrupt archive by message, since
+      // yauzl does not give these a distinct error type.
+      const unsafePathPattern = /^(absolute path|invalid relative path|invalid characters in fileName): /;
       fail(
         unsafePathPattern.test(err.message)
           ? new UnsafeArchiveEntryError(archivePath, err.message)
@@ -186,7 +222,19 @@ async function extractArchive(archivePath, destDir) {
 
         await fs.promises.mkdir(path.dirname(destPath), { recursive: true, mode: DIR_MODE });
         const stream = await readEntryStream(zipfile, entry);
-        await pipeline(stream, fs.createWriteStream(destPath, { mode: FILE_MODE, flags: 'wx' }));
+        try {
+          await pipeline(
+            stream,
+            crcVerifyTransform(entry, archivePath),
+            fs.createWriteStream(destPath, { mode: FILE_MODE, flags: 'wx' }),
+          );
+        } catch (err) {
+          // A CRC32 mismatch is only known once the write stream has
+          // already received (and likely written) bytes -- remove the
+          // partial file rather than leaving corrupt content on disk.
+          await fs.promises.rm(destPath, { force: true });
+          throw err;
+        }
         zipfile.readEntry();
       })().catch((err) => {
         fail(err instanceof CorruptArchiveError || err instanceof UnsafeArchiveEntryError

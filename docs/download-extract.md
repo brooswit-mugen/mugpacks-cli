@@ -64,6 +64,14 @@ touches `installDir`:
   by some other means (not just one declared by the archive itself) is
   never followed. Files are opened with exclusive (`wx`) creation, so
   writing never silently follows or replaces an existing path either.
+- **Extracted bytes are checked against the entry's declared CRC32.**
+  `yauzl` (the zip parser used here) validates each entry's declared byte
+  *count* but, by its own documentation, never checks the declared CRC32
+  against what it actually decompresses. This module computes the CRC32 of
+  each entry's bytes as they stream to disk and fails the archive with
+  `CorruptArchiveError` if it doesn't match, so a same-length payload
+  corrupted in transit or on disk cannot be silently accepted as a
+  successful extraction; the partial output file for that entry is removed.
 - **Preserves existing content.** Because every write stays inside the
   throwaway staging directory until the caller explicitly copies
   `contentPath` out, a failed or unsafe fetch can never partially mutate
