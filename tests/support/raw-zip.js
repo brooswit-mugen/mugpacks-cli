@@ -23,10 +23,16 @@ function buildRawZip(entries) {
   const centralParts = [];
   let offset = 0;
 
-  for (const { name, content = '' } of entries) {
+  for (const { name, content = '', unixMode } of entries) {
     const nameBuf = Buffer.from(name, 'utf8');
     const dataBuf = Buffer.from(content, 'utf8');
     const crc = zlib.crc32(dataBuf);
+    // Unix-style external file attributes (host byte 3 == Unix), mode bits
+    // in the upper 16 bits -- e.g. 0o120777 (S_IFLNK | 0777) for a symlink
+    // entry whose "content" is the link target, exactly how zip tools
+    // (Info-ZIP et al.) record a symlink. Omitted for ordinary file entries.
+    const versionMadeBy = unixMode != null ? (3 << 8) | 20 : 20;
+    const externalAttrs = unixMode != null ? (unixMode << 16) >>> 0 : 0;
 
     const localHeader = Buffer.alloc(30);
     localHeader.writeUInt32LE(0x04034b50, 0); // local file header signature
@@ -45,7 +51,7 @@ function buildRawZip(entries) {
 
     const centralHeader = Buffer.alloc(46);
     centralHeader.writeUInt32LE(0x02014b50, 0); // central dir signature
-    centralHeader.writeUInt16LE(20, 4); // version made by
+    centralHeader.writeUInt16LE(versionMadeBy, 4); // version made by
     centralHeader.writeUInt16LE(20, 6); // version needed
     centralHeader.writeUInt16LE(0, 8); // flags
     centralHeader.writeUInt16LE(0, 10); // method = stored
@@ -59,7 +65,7 @@ function buildRawZip(entries) {
     centralHeader.writeUInt16LE(0, 32); // comment length
     centralHeader.writeUInt16LE(0, 34); // disk number start
     centralHeader.writeUInt16LE(0, 36); // internal attrs
-    centralHeader.writeUInt32LE(0, 38); // external attrs
+    centralHeader.writeUInt32LE(externalAttrs, 38); // external attrs
     centralHeader.writeUInt32LE(offset, 42); // local header offset
 
     centralParts.push(centralHeader, nameBuf);

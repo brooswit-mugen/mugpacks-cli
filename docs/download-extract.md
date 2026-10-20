@@ -54,15 +54,18 @@ touches `installDir`:
 - **Never executed.** Extracted files are written with plain,
   non-executable permissions; nothing extracted is ever run, regardless of
   any executable bit recorded in the archive.
+- **No symlinks, and no following them.** Any entry whose recorded Unix
+  mode marks it as a symlink (or any other non-regular-file,
+  non-directory special type -- FIFOs, devices, sockets) is rejected
+  outright; nothing extracted from this module is ever a symlink.
+  Independently of that, every path component from the staging directory
+  down to each entry's destination is `lstat`-checked before it is
+  written through -- so even a symlink that reached the staging directory
+  by some other means (not just one declared by the archive itself) is
+  never followed. Files are opened with exclusive (`wx`) creation, so
+  writing never silently follows or replaces an existing path either.
 - **Preserves existing content.** Because every write stays inside the
   throwaway staging directory until the caller explicitly copies
   `contentPath` out, a failed or unsafe fetch can never partially mutate
   `installDir` -- existing files there are left untouched by this module by
   construction, not by a separate check.
-
-## Known limitation
-
-No symlink-based traversal defense is implemented or tested here (symlink
-zip entries are platform/tool-dependent to author and to extract
-portably); only `..`/absolute/drive/UNC entry-name forms are covered. This
-mirrors the same gap flagged in the MUGEN-9 `FIXTURES.md`.

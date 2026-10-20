@@ -133,6 +133,70 @@ test('rejects an entry containing a backslash', async () => {
   );
 });
 
+test('rejects a symlink entry whose target points outside destDir, and writes nothing outside it', async () => {
+  const { archivePath, destDir } = await tmpDirs();
+  // A real zip-slip-via-symlink attack: entry 1 is a symlink named "link"
+  // pointing at "../../../" (outside destDir); entry 2 writes a file
+  // *through* that link name, which would land outside destDir if the
+  // symlink were ever created and then followed.
+  const zip = buildRawZip([
+    { name: 'link', content: '../../../', unixMode: 0o120777 },
+    { name: 'link/escaped.txt', content: 'should never land' },
+  ]);
+  await fs.promises.writeFile(archivePath, zip);
+
+  await assert.rejects(
+    () => extractArchive(archivePath, destDir),
+    (err) => {
+      assert.ok(err instanceof UnsafeArchiveEntryError);
+      return true;
+    },
+  );
+
+  assert.equal(fs.existsSync(path.join(destDir, 'link')), false);
+  const root = path.dirname(destDir);
+  assert.equal(fs.existsSync(path.join(root, 'escaped.txt')), false);
+  assert.equal(fs.existsSync(path.join(path.dirname(root), 'escaped.txt')), false);
+});
+
+test('rejects a Unix special-file entry (e.g. a FIFO) that is neither a regular file nor a directory', async () => {
+  const { archivePath, destDir } = await tmpDirs();
+  const S_IFIFO = 0o010000;
+  const zip = buildRawZip([{ name: 'weird-pipe', content: '', unixMode: S_IFIFO | 0o644 }]);
+  await fs.promises.writeFile(archivePath, zip);
+
+  await assert.rejects(
+    () => extractArchive(archivePath, destDir),
+    (err) => {
+      assert.ok(err instanceof UnsafeArchiveEntryError);
+      return true;
+    },
+  );
+});
+
+test('refuses to write through a symlink that already exists on disk under destDir, independent of entry-type detection', async () => {
+  const { archivePath, destDir } = await tmpDirs();
+  // Simulate a pre-existing on-disk symlink under destDir (e.g. planted by
+  // some other bug or a prior partial run) rather than one declared via
+  // archive entry attributes -- this exercises the no-follow ancestor
+  // check on its own, independent of assertNotLinkOrSpecialEntry.
+  const escapeDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mugpacks-extract-escape-'));
+  await fs.promises.symlink(escapeDir, path.join(destDir, 'planted-link'));
+
+  const zip = await buildZip([{ name: 'planted-link/evil.txt', content: 'should never land' }]);
+  await fs.promises.writeFile(archivePath, zip);
+
+  await assert.rejects(
+    () => extractArchive(archivePath, destDir),
+    (err) => {
+      assert.ok(err instanceof UnsafeArchiveEntryError);
+      return true;
+    },
+  );
+
+  assert.equal(fs.existsSync(path.join(escapeDir, 'evil.txt')), false);
+});
+
 test('a truncated/corrupt archive fails with CorruptArchiveError, not a raw parser exception', async () => {
   const { archivePath, destDir } = await tmpDirs();
   await fs.promises.writeFile(archivePath, Buffer.from('this is not a zip file at all'));

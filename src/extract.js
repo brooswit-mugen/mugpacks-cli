@@ -13,6 +13,55 @@ const {
 const FILE_MODE = 0o644;
 const DIR_MODE = 0o755;
 
+const UNIX_HOST_BYTE = 3; // version-made-by high byte for "Unix"
+const S_IFMT = 0xf000;
+const S_IFLNK = 0xa000;
+const S_IFREG = 0x8000;
+const S_IFDIR = 0x4000;
+
+// Reject symlink (and any other non-regular-file/non-directory) entries
+// outright: this archive format has no legitimate use for them here, and
+// a symlink entry is exactly how a zip-based link-escape attack plants its
+// escape hatch (point a link outside destDir, then have a later entry
+// write "through" it). Not extracting it at all is simpler and safer than
+// trying to validate a link target.
+function assertNotLinkOrSpecialEntry(entry) {
+  const isUnix = (entry.versionMadeBy >> 8) === UNIX_HOST_BYTE;
+  if (!isUnix) return; // no unix mode bits recorded; nothing to check
+  const mode = entry.externalFileAttributes >>> 16;
+  if (mode === 0) return; // some tools leave this zeroed for plain files
+  const fileType = mode & S_IFMT;
+  if (fileType === S_IFLNK) {
+    throw new UnsafeArchiveEntryError(entry.fileName, 'symlink entries are not allowed');
+  }
+  if (fileType !== 0 && fileType !== S_IFREG && fileType !== S_IFDIR) {
+    throw new UnsafeArchiveEntryError(entry.fileName, 'not a regular file or directory');
+  }
+}
+
+// Independent of the entry-name string checks and of rejecting symlink
+// entries above: walk every path component from destDir down to destPath
+// and verify none of them is *already* a symlink on disk, so extraction
+// never follows a link to escape destDir regardless of how that link got
+// there (a no-follow containment check, not just a lexical one).
+async function assertNoSymlinkAncestors(destDir, destPath) {
+  const rel = path.relative(destDir, destPath);
+  const segments = rel.split(path.sep).filter(Boolean);
+  let current = destDir;
+  for (const segment of segments) {
+    current = path.join(current, segment);
+    let stat;
+    try {
+      stat = await fs.promises.lstat(current);
+    } catch {
+      continue; // does not exist yet -- nothing to follow
+    }
+    if (stat.isSymbolicLink()) {
+      throw new UnsafeArchiveEntryError(rel, `"${segment}" is a symlink`);
+    }
+  }
+}
+
 // Reject anything that isn't a plain, relative, forward-slash zip entry
 // path. This is independent of whatever the config's `subpath` validation
 // already did (MUGEN-5 49071/49088/49094) -- extraction owns its own
@@ -125,7 +174,9 @@ async function extractArchive(archivePath, destDir) {
     zipfile.on('entry', (entry) => {
       (async () => {
         assertSafeEntryName(entry.fileName);
+        assertNotLinkOrSpecialEntry(entry);
         const destPath = resolveContained(destDir, entry.fileName);
+        await assertNoSymlinkAncestors(destDir, destPath);
 
         if (entry.fileName.endsWith('/')) {
           await fs.promises.mkdir(destPath, { recursive: true, mode: DIR_MODE });
@@ -135,7 +186,7 @@ async function extractArchive(archivePath, destDir) {
 
         await fs.promises.mkdir(path.dirname(destPath), { recursive: true, mode: DIR_MODE });
         const stream = await readEntryStream(zipfile, entry);
-        await pipeline(stream, fs.createWriteStream(destPath, { mode: FILE_MODE }));
+        await pipeline(stream, fs.createWriteStream(destPath, { mode: FILE_MODE, flags: 'wx' }));
         zipfile.readEntry();
       })().catch((err) => {
         fail(err instanceof CorruptArchiveError || err instanceof UnsafeArchiveEntryError
@@ -159,6 +210,7 @@ async function extractArchive(archivePath, destDir) {
  */
 async function resolveSubpath(stagingDir, subpath) {
   const target = subpath === '' ? stagingDir : resolveContained(stagingDir, subpath);
+  await assertNoSymlinkAncestors(stagingDir, target);
   try {
     await fs.promises.access(target);
   } catch {
