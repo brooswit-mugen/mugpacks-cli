@@ -45,13 +45,14 @@ Built against the config/command/error contract from MUGEN-5 comment 49028
   themselves are structurally correct (def files have the sections the
   acceptance tests will assume, archives contain/lack the entries their
   scenario needs). `node --test tests/fixtures` — currently 10/10 passing.
-- `tests/acceptance/` — the CLI acceptance contract, one `test.todo` per
-  required behavior (happy path, each config/download/archive error, repeat-
-  run idempotency, preserve-unrelated-content, fail-fast/no-partial-mutation
-  on a mixed success+failure run). `node --test tests/acceptance` —
-  currently 16/16 registering as `todo` (none failing). MUGEN-10 turns each
-  `test.todo(...)` into a real assertion once MUGEN-8's pipeline exists,
-  using the harness note at the top of that file.
+- `tests/acceptance/` — the CLI acceptance contract, one test per required
+  behavior (happy path, each config/download/archive error, repeat-run
+  idempotency, preserve-unrelated-content, fail-fast/no-partial-mutation on
+  a mixed success+failure run). `node --test tests/acceptance` — MUGEN-10
+  turned every `test.todo(...)` into a real assertion against the finished
+  MUGEN-6/7/8 pipeline; currently 17/17 passing, 0 todo, using the harness
+  described at the top of that file (fixtures/mugen-root copied to a fresh
+  temp dir per test, fixtures/archives served over a local HTTP server).
 
 ## Known limitation
 
