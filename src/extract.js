@@ -222,17 +222,26 @@ async function extractArchive(archivePath, destDir) {
 
         await fs.promises.mkdir(path.dirname(destPath), { recursive: true, mode: DIR_MODE });
         const stream = await readEntryStream(zipfile, entry);
+        const writeStream = fs.createWriteStream(destPath, { mode: FILE_MODE, flags: 'wx' });
+        // 'wx' means createWriteStream itself can fail with EEXIST (e.g. a
+        // duplicate entry name, or anything else already at destPath) --
+        // in that case this attempt never created a file, so the cleanup
+        // below must not delete whatever is already there. Only treat
+        // destPath as ours to remove once the fd has actually been opened
+        // by this attempt.
+        let created = false;
+        writeStream.once('open', () => {
+          created = true;
+        });
         try {
-          await pipeline(
-            stream,
-            crcVerifyTransform(entry, archivePath),
-            fs.createWriteStream(destPath, { mode: FILE_MODE, flags: 'wx' }),
-          );
+          await pipeline(stream, crcVerifyTransform(entry, archivePath), writeStream);
         } catch (err) {
           // A CRC32 mismatch is only known once the write stream has
           // already received (and likely written) bytes -- remove the
           // partial file rather than leaving corrupt content on disk.
-          await fs.promises.rm(destPath, { force: true });
+          if (created) {
+            await fs.promises.rm(destPath, { force: true });
+          }
           throw err;
         }
         zipfile.readEntry();

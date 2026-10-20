@@ -222,6 +222,23 @@ test('rejects an entry whose extracted bytes do not match its declared CRC32, an
   assert.equal(fs.existsSync(path.join(destDir, 'kfm/kfm.def')), false);
 });
 
+test('a destination collision (EEXIST from the exclusive "wx" write) fails without deleting the pre-existing file', async () => {
+  const { archivePath, destDir } = await tmpDirs();
+  await fs.promises.mkdir(path.join(destDir, 'kfm'));
+  const preExistingPath = path.join(destDir, 'kfm/kfm.def');
+  await fs.promises.writeFile(preExistingPath, 'pre-existing, must survive');
+
+  const zip = await buildZip([{ name: 'kfm/kfm.def', content: 'new content' }]);
+  await fs.promises.writeFile(archivePath, zip);
+
+  await assert.rejects(() => extractArchive(archivePath, destDir));
+
+  // This attempt never created kfm/kfm.def (createWriteStream's 'wx' flag
+  // failed with EEXIST before any byte was written) -- cleanup must not
+  // delete a file it didn't create.
+  assert.equal(await fs.promises.readFile(preExistingPath, 'utf8'), 'pre-existing, must survive');
+});
+
 test('a truncated/corrupt archive fails with CorruptArchiveError, not a raw parser exception', async () => {
   const { archivePath, destDir } = await tmpDirs();
   await fs.promises.writeFile(archivePath, Buffer.from('this is not a zip file at all'));
