@@ -1,0 +1,21 @@
+{
+  "name": "mugpacks-cli",
+  "version": "0.1.0",
+  "description": "Config-driven M.U.G.E.N. content installer CLI.",
+  "license": "MIT",
+  "private": true,
+  "bin": {
+    "mugpacks": "./bin/mugpacks.js"
+  },
+  "main": "src/index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "yaml": "^2.5.1"
+  }
+}
