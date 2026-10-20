@@ -3,6 +3,7 @@
 const path = require('path');
 
 const { loadConfig } = require('./config');
+const { installPlan } = require('./install');
 const { ConfigError } = require('./errors');
 const { DEFAULT_CONFIG_FILENAME } = require('./constants');
 
@@ -32,14 +33,17 @@ function parseArgs(argv) {
   return { command, configPath: path.resolve(configPath) };
 }
 
-// Runs the `mugpacks` CLI for one invocation. Returns the process exit
-// code; writes human-readable `error: ...` lines to stderr.
+// Runs the `mugpacks` CLI for one invocation. Resolves with the process
+// exit code; writes human-readable `error: ...` lines to stderr.
 //
-// MUGEN-6's scope stops at producing a validated, normalized installation
-// plan (see src/config.js) -- actually downloading/extracting archives and
-// writing/registering installed content is MUGEN-7/MUGEN-8's extraction
-// and registration work, not duplicated here.
-function run(argv, { stdout = process.stdout, stderr = process.stderr } = {}) {
+// Config parsing/validation (MUGEN-6) stays fail-fast and synchronous: any
+// ConfigError is reported and nothing below it -- including every
+// download, extraction, or installDir write (MUGEN-7/MUGEN-8) -- ever
+// runs, so a bad config never partially mutates installDir. Once a plan
+// is validated, each item is installed and registered independently;
+// MUGEN-5's per-item contract does not require rolling back an item that
+// already installed successfully just because a later item failed.
+async function run(argv, { stdout = process.stdout, stderr = process.stderr } = {}) {
   let configPath;
   try {
     ({ configPath } = parseArgs(argv));
@@ -60,6 +64,14 @@ function run(argv, { stdout = process.stdout, stderr = process.stderr } = {}) {
       return EXIT_ERROR;
     }
     throw err;
+  }
+
+  const failures = await installPlan(plan);
+  if (failures.length > 0) {
+    for (const { id, error } of failures) {
+      stderr.write(`error: item "${id}": ${error.message}\n`);
+    }
+    return EXIT_ERROR;
   }
 
   stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
