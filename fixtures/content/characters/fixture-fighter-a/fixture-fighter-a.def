@@ -1,0 +1,18 @@
+[Info]
+name = "Fixture Fighter A"
+displayname = "Fixture Fighter A"
+author = "MUGEN-9 fixture"
+versiondate = 2026-10-19
+
+[Files]
+cmd = fixture-fighter-a.cmd
+cns = fixture-fighter-a.cns
+sprite = fixture-fighter-a.sff
+anim = fixture-fighter-a.air
+sound = fixture-fighter-a.snd
+
+[Palette Keymap]
+value = 1
+
+[Arcade]
+intro.storyboard =

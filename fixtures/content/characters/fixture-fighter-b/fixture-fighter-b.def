@@ -1,0 +1,15 @@
+[Info]
+name = "Fixture Fighter B"
+displayname = "Fixture Fighter B"
+author = "MUGEN-9 fixture"
+versiondate = 2026-10-19
+
+[Files]
+cmd = fixture-fighter-b.cmd
+cns = fixture-fighter-b.cns
+sprite = fixture-fighter-b.sff
+anim = fixture-fighter-b.air
+sound = fixture-fighter-b.snd
+
+[Palette Keymap]
+value = 1

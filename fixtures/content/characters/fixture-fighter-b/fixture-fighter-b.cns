@@ -1,0 +1,4 @@
+; FIXTURE PLACEHOLDER - synthetic content for MUGEN-9, not a playable character.
+[Data]
+life = 1000
+power = 3000

@@ -1,0 +1,7 @@
+# Archive at this url contains an absolute-path entry.
+installDir: __INSTALL_DIR__
+items:
+  - id: fixture-fighter-a
+    type: char
+    url: __FIXTURE_SERVER__/archives/malicious/absolute-path.zip
+    subpath: fixture-fighter-a/

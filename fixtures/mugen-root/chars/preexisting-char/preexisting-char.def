@@ -1,0 +1,5 @@
+; Pre-existing unrelated character already installed by the user before the
+; CLI ever ran. Install/registration runs must never touch, move or remove
+; this file. Used to assert "preserve unrelated files/entries".
+[Info]
+name = "Pre-existing Char"

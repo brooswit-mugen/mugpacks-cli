@@ -1,0 +1,7 @@
+# Archive at this url contains a "../" path-traversal entry.
+installDir: __INSTALL_DIR__
+items:
+  - id: fixture-fighter-a
+    type: char
+    url: __FIXTURE_SERVER__/archives/malicious/zip-slip-traversal.zip
+    subpath: fixture-fighter-a/

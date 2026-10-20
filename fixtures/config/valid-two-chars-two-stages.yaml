@@ -1,0 +1,21 @@
+# Valid minimal config exercising two characters and two stages.
+# installDir is filled in by the test harness at run time to point at a
+# throwaway copy of fixtures/mugen-root (see tests/acceptance).
+installDir: __INSTALL_DIR__
+items:
+  - id: fixture-fighter-a
+    type: char
+    url: __FIXTURE_SERVER__/archives/characters/fixture-fighter-a.zip
+    subpath: fixture-fighter-a/
+  - id: fixture-fighter-b
+    type: char
+    url: __FIXTURE_SERVER__/archives/characters/fixture-fighter-b.zip
+    subpath: fixture-fighter-b/
+  - id: fixture-stage-dojo
+    type: stage
+    url: __FIXTURE_SERVER__/archives/stages/fixture-stage-dojo.zip
+    subpath: ""
+  - id: fixture-stage-arena
+    type: stage
+    url: __FIXTURE_SERVER__/archives/stages/fixture-stage-arena.zip
+    subpath: ""

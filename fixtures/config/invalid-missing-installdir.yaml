@@ -1,0 +1,6 @@
+# Missing required installDir field.
+items:
+  - id: fixture-fighter-a
+    type: char
+    url: __FIXTURE_SERVER__/archives/characters/fixture-fighter-a.zip
+    subpath: fixture-fighter-a/
