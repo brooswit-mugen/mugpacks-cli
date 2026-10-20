@@ -9,7 +9,10 @@
 // `test.todo` placeholders this file used to hold with real assertions on
 // exit code, stdout/stderr, and the resulting installDir contents.
 //
-// Run with: node --test tests/acceptance
+// Run with: node --test tests/acceptance/*.test.js
+// (a bare directory argument is treated as a module by node --test on
+// Node 24 and fails with MODULE_NOT_FOUND; an explicit file glob works on
+// every supported Node version.)
 'use strict';
 
 const assert = require('node:assert/strict');

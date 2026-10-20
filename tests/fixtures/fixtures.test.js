@@ -2,7 +2,7 @@
 // run today, before MUGEN-6/7/8 exist, and guard against the fixtures
 // silently rotting (e.g. a rebuilt archive losing its path-traversal entry).
 //
-// Run with: node --test tests/fixtures
+// Run with: node --test tests/fixtures/*.test.js
 'use strict';
 
 const { test } = require('node:test');

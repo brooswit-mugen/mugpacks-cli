@@ -56,7 +56,7 @@ exits `0`. On any failure it exits non-zero and writes one or more
   item; every other item in the same config still installs and registers
   normally (see "Known limitations" below).
 
-`tests/acceptance/cli-acceptance.test.js` (`node --test tests/acceptance`) is
+`tests/acceptance/cli-acceptance.test.js` (`node --test tests/acceptance/*.test.js`) is
 a runnable, fixture-driven demonstration of this contract end to end: it
 copies `fixtures/mugen-root` to a throwaway directory, serves
 `fixtures/archives/**` over a local HTTP server, and runs the real CLI

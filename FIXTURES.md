@@ -44,11 +44,13 @@ Built against the config/command/error contract from MUGEN-5 comment 49028
 - `tests/fixtures/` — runs now, no CLI required: validates the fixtures
   themselves are structurally correct (def files have the sections the
   acceptance tests will assume, archives contain/lack the entries their
-  scenario needs). `node --test tests/fixtures` — currently 10/10 passing.
+  scenario needs). `node --test tests/fixtures/*.test.js` — currently 10/10
+  passing.
 - `tests/acceptance/` — the CLI acceptance contract, one test per required
   behavior (happy path, each config/download/archive error, repeat-run
   idempotency, preserve-unrelated-content, fail-fast/no-partial-mutation on
-  a mixed success+failure run). `node --test tests/acceptance` — MUGEN-10
+  a mixed success+failure run). `node --test tests/acceptance/*.test.js` —
+  MUGEN-10
   turned every `test.todo(...)` into a real assertion against the finished
   MUGEN-6/7/8 pipeline; currently 17/17 passing, 0 todo, using the harness
   described at the top of that file (fixtures/mugen-root copied to a fresh
