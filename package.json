@@ -1,16 +1,21 @@
 {
   "name": "mugpacks-cli",
   "version": "0.1.0",
+  "description": "Config-driven M.U.G.E.N. content installer CLI.",
+  "license": "MIT",
   "private": true,
-  "description": "A minimal command-line tool for installing M.U.G.E.N. characters and stages listed in a configuration file into a specified M.U.G.E.N. directory.",
-  "main": "index.js",
-  "scripts": {
-    "test": "node --test tests"
+  "bin": {
+    "mugpacks": "./bin/mugpacks.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
   "dependencies": {
+    "yaml": "^2.5.1",
     "yauzl": "^3.4.0"
   },
   "devDependencies": {
