@@ -36,6 +36,50 @@ items:
 
 `char` items install to `installDir/chars/<id>`; `stage` items install to `installDir/stages/<id>`.
 
+## Usage
+
+```sh
+npm install
+npx mugpacks install                       # reads ./mugpacks.yaml
+npx mugpacks install --config path/to/my-mugpacks.yaml
+```
+
+On success, the CLI prints the normalized install plan (JSON) to stdout and
+exits `0`. On any failure it exits non-zero and writes one or more
+`error: ...` lines to stderr instead:
+
+- A config/validation problem (bad or missing field, duplicate id, `installDir`
+  missing or not a directory, ...) prints a single `error: ...` line and exits
+  before anything is downloaded or `installDir` is touched at all.
+- A per-item failure past validation (download error, corrupt/unsafe archive,
+  missing subpath, ...) prints one `error: item "<id>": ...` line per failed
+  item; every other item in the same config still installs and registers
+  normally (see "Known limitations" below).
+
+`tests/acceptance/cli-acceptance.test.js` (`node --test tests/acceptance/*.test.js`) is
+a runnable, fixture-driven demonstration of this contract end to end: it
+copies `fixtures/mugen-root` to a throwaway directory, serves
+`fixtures/archives/**` over a local HTTP server, and runs the real CLI
+against `fixtures/config/*.yaml` for the happy path, every documented error,
+repeat-install idempotency, and preserved pre-existing content.
+
+## Known limitations
+
+- Only **zip** archives are supported (matching the fixture set); no tar,
+  7z, or rar.
+- No global rollback: in a multi-item config, an item that fails to
+  download/extract/install does not undo any other item that already
+  installed and registered successfully in the same run (MUGEN-5's agreed
+  per-item contract; see `docs/install-registration.md`).
+- No symlink-based archive-traversal fixture is exercised (zip symlink
+  entries are platform/tool-dependent to author reliably) -- only `../`
+  path-traversal and absolute-path entries are covered. See `FIXTURES.md`.
+- An item's content must contain exactly one top-level `.def` file (or, if
+  several, one named `<id>.def`); otherwise that item's install fails with
+  a clear error rather than guessing (`src/install-errors.js`).
+- Build/test tool only: this repository does not deploy to a live
+  M.U.G.E.N. installation, install the engine, or launch anything.
+
 ## Development
 
 ```sh
