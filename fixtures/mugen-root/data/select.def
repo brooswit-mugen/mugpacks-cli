@@ -1,0 +1,8 @@
+; Pre-existing select.def with content the user added manually before the
+; CLI ever ran, plus a MUGEN-9 fixture marker. Registration of fixture
+; chars/stages must only ADD the expected entries once, and must never
+; remove, duplicate or reorder this pre-existing content.
+[Characters]
+preexisting-char, preexisting-char/preexisting-char.def
+
+[ExtraStages]

@@ -15,6 +15,10 @@
     "test": "node --test"
   },
   "dependencies": {
-    "yaml": "^2.5.1"
+    "yaml": "^2.5.1",
+    "yauzl": "^3.4.0"
+  },
+  "devDependencies": {
+    "yazl": "^3.3.1"
   }
 }

@@ -1,0 +1,7 @@
+# url is not a valid http(s) URL (uses file:// scheme).
+installDir: __INSTALL_DIR__
+items:
+  - id: fixture-fighter-a
+    type: char
+    url: file:///etc/passwd
+    subpath: fixture-fighter-a/

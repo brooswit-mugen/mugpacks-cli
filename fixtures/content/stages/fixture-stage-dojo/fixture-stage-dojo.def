@@ -1,0 +1,36 @@
+[Info]
+name = "Fixture Stage: Dojo"
+author = "MUGEN-9 fixture"
+versiondate = 2026-10-19
+
+[Camera]
+startx = 0
+starty = 0
+boundleft = -200
+boundright = 200
+boundhigh = -240
+boundlow = 0
+
+[PlayerInfo]
+p1startx = -70
+p1starty = 0
+p2startx = 70
+p2starty = 0
+
+[Bound]
+screenleft = 20
+screenright = 20
+
+[StageInfo]
+localcoord = 320,240
+
+[BGdef]
+spr = fixture-stage-dojo.sff
+debugbg = 0
+
+[BG 0]
+type = normal
+spriteno = 0,0
+layerno = 0
+start = 0,0
+delta = 1,1
