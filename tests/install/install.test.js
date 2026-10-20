@@ -9,6 +9,7 @@ const { test } = require('node:test');
 const { buildZip } = require('../support/make-zip');
 const { installItem, installPlan } = require('../../src/install');
 const { UnsafeDestinationError } = require('../../src/path-safety');
+const { UnsafeDefFileNameError } = require('../../src/install-errors');
 
 async function withZipServer(routes, fn) {
   const server = http.createServer((req, res) => {
@@ -142,6 +143,54 @@ test('installPlan continues past a failed item and reports it without touching t
     assert.equal(
       fs.readFileSync(path.join(installDir, 'data', 'select.def'), 'utf8'),
       '[Characters]\nfixture-fighter-a/fixture-fighter-a.def, random\n',
+    );
+  });
+});
+
+test('a reinstall whose def filename changed replaces the item\'s select.def row instead of duplicating it', async () => {
+  const oldZip = await buildZip([{ name: 'fighter/a.def', content: 'old' }]);
+  const newZip = await buildZip([{ name: 'fighter/b.def', content: 'new' }]);
+
+  await withZipServer({ '/old.zip': oldZip, '/new.zip': newZip }, async (base) => {
+    const installDir = makeInstallDir();
+    const destDir = path.join(installDir, 'chars', 'fighter');
+
+    await installItem(installDir, item({ id: 'fighter', subpath: 'fighter/', url: `${base}/old.zip`, destDir }));
+    await installItem(installDir, item({ id: 'fighter', subpath: 'fighter/', url: `${base}/new.zip`, destDir }));
+
+    assert.equal(fs.existsSync(path.join(destDir, 'a.def')), false, 'the old def file must be gone from disk');
+    assert.equal(fs.readFileSync(path.join(destDir, 'b.def'), 'utf8'), 'new');
+
+    const selectDef = fs.readFileSync(path.join(installDir, 'data', 'select.def'), 'utf8');
+    assert.equal(selectDef.match(/^fighter\//gm).length, 1, 'only one row for this item must remain');
+    assert.equal(selectDef, '[Characters]\nfighter/b.def, random\n');
+  });
+});
+
+test('an installed .def filename select.def cannot represent is rejected before the previous install is touched', async () => {
+  const oldZip = await buildZip([{ name: 'fighter/fighter.def', content: 'good, keep me' }]);
+  const badZip = await buildZip([{ name: 'fighter/bad;name.def', content: 'unsafe' }]);
+
+  await withZipServer({ '/old.zip': oldZip, '/bad.zip': badZip }, async (base) => {
+    const installDir = makeInstallDir();
+    const destDir = path.join(installDir, 'chars', 'fighter');
+
+    await installItem(installDir, item({ id: 'fighter', subpath: 'fighter/', url: `${base}/old.zip`, destDir }));
+
+    await assert.rejects(
+      () => installItem(installDir, item({ id: 'fighter', subpath: 'fighter/', url: `${base}/bad.zip`, destDir })),
+      (err) => {
+        assert.ok(err instanceof UnsafeDefFileNameError);
+        return true;
+      },
+    );
+
+    // Validation ran against the staged content before the previous
+    // install was touched, so the old, good install must still be there.
+    assert.equal(fs.readFileSync(path.join(destDir, 'fighter.def'), 'utf8'), 'good, keep me');
+    assert.equal(
+      fs.readFileSync(path.join(installDir, 'data', 'select.def'), 'utf8'),
+      '[Characters]\nfighter/fighter.def, random\n',
     );
   });
 });

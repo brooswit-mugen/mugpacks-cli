@@ -3,7 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { fetchContent } = require('./staging');
-const { registerSelections } = require('./registry');
+const { registerSelections, resolveDefFile } = require('./registry');
 const { assertNoSymlinkAncestors } = require('./path-safety');
 
 // Replaces `destDir` with a fresh copy of `srcDir`'s contents. Removing
@@ -30,14 +30,23 @@ async function replaceInstalledContent(installDir, srcDir, destDir) {
 // installDir/data/select.def (MUGEN-8). installDir is never touched until
 // the fetch has fully succeeded, so a fetch failure leaves installDir
 // exactly as it was for this item.
+//
+// The item's .def filename is resolved and validated against the staged
+// content BEFORE installDir's previous content for this item is
+// destructively replaced: a missing, ambiguous, or select.def-grammar-
+// unsafe .def name aborts here with the old install for this item still
+// intact, rather than discovering the problem only after it's already
+// gone.
 async function installItem(installDir, item) {
   const { contentPath, cleanup } = await fetchContent(item.url, item.subpath);
+  let defFile;
   try {
+    defFile = await resolveDefFile(item.id, contentPath);
     await replaceInstalledContent(installDir, contentPath, item.destDir);
   } finally {
     await cleanup();
   }
-  await registerSelections(installDir, [item]);
+  await registerSelections(installDir, [{ ...item, defFile }]);
 }
 
 // Installs every item in a normalized plan. Each item is attempted

@@ -29,6 +29,10 @@ download/extraction (`src/{download,extract,staging}.js`).
   `installDir/{chars,stages}/<id>` nor `installDir/data/select.def` can be
   redirected outside `installDir` by a symlink planted at any point along
   the way.
+- `src/install-errors.js` -- structured errors for a missing, ambiguous,
+  or select.def-grammar-unsafe `.def` filename (see `resolveDefFile`
+  below), rendered the same way any other per-item install failure is
+  (`error: item "<id>": ...`).
 
 ## Contract notes
 
@@ -64,3 +68,21 @@ download/extraction (`src/{download,extract,staging}.js`).
   this and does not follow it (its second field is a char-relative def
   path, not a stage); that line is pre-existing content and is preserved
   byte-for-byte, not a syntax this module imitates for new entries.
+- **A changed `.def` filename replaces the item's row, not just its
+  content.** An archive's content can be renamed between two installs of
+  the same `id` (e.g. a package goes from shipping `a.def` to `b.def`);
+  `registerSelections` detects the item's own previous row by a
+  `<id>/`-or-`stages/<id>/` prefix (safe because an `id` can never contain
+  `/`, see `src/config.js`'s `ID_PATTERN`) and replaces it rather than
+  appending a second, stale row next to the new one. Rows belonging to
+  any other item, or hand-added to the file, are never touched by this.
+- **`.def` filenames are validated against select.def's own grammar
+  before they are ever interpolated into a line, and before the
+  previous install for that item is destructively replaced.**
+  select.def reserves `,` as the field separator and `;` as the
+  comment-start character, and no control character has a sane meaning
+  in it; `resolveDefFile` rejects any of those with
+  `UnsafeDefFileNameError` while `destDir` still holds the previous,
+  known-good install for that item -- a filename like `bad;name.def`
+  would otherwise install "successfully" while turning the rest of its
+  select.def line into a comment, silently pointing at nothing.

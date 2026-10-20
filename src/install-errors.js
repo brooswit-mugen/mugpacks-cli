@@ -24,4 +24,16 @@ class AmbiguousDefFileError extends Error {
   }
 }
 
-module.exports = { MissingDefFileError, AmbiguousDefFileError };
+// Thrown when the resolved .def filename contains a character select.def's
+// own grammar can't represent in a row (a comma, a semicolon, or a
+// control character).
+class UnsafeDefFileNameError extends Error {
+  constructor(id, defFile) {
+    super(`item "${id}": installed .def filename "${defFile}" contains a character select.def's syntax cannot represent (comma, semicolon, or control character)`);
+    this.name = 'UnsafeDefFileNameError';
+    this.id = id;
+    this.defFile = defFile;
+  }
+}
+
+module.exports = { MissingDefFileError, AmbiguousDefFileError, UnsafeDefFileNameError };
