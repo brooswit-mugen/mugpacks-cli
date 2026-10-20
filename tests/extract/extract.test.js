@@ -119,9 +119,12 @@ test('rejects a UNC-prefixed entry', async () => {
   );
 });
 
-test('rejects an entry containing a backslash', async () => {
+test('rejects an entry containing a backslash, isolated from any ".." segment', async () => {
   const { archivePath, destDir } = await tmpDirs();
-  const zip = buildRawZip([{ name: 'kfm\\..\\evil.txt', content: 'nope' }]);
+  // No ".." anywhere in this name -- with strictFileNames:true this is
+  // rejected purely for containing a backslash, not because some other
+  // check (e.g. traversal) would also catch it.
+  const zip = buildRawZip([{ name: 'kfm\\evil.txt', content: 'nope' }]);
   await fs.promises.writeFile(archivePath, zip);
 
   await assert.rejects(
@@ -195,6 +198,45 @@ test('refuses to write through a symlink that already exists on disk under destD
   );
 
   assert.equal(fs.existsSync(path.join(escapeDir, 'evil.txt')), false);
+});
+
+test('rejects an entry whose extracted bytes do not match its declared CRC32, and leaves no partial file', async () => {
+  const { archivePath, destDir } = await tmpDirs();
+  // Same declared length and CRC32 as the original content, but the actual
+  // stored bytes are corrupted -- yauzl's own validateEntrySizes only
+  // checks byte *count*, so this must be caught by CRC32 verification,
+  // not by size validation.
+  const zip = buildRawZip([
+    { name: 'kfm/kfm.def', content: '[Info]\nname = "fixture"\n', corruptPayload: true },
+  ]);
+  await fs.promises.writeFile(archivePath, zip);
+
+  await assert.rejects(
+    () => extractArchive(archivePath, destDir),
+    (err) => {
+      assert.ok(err instanceof CorruptArchiveError);
+      return true;
+    },
+  );
+
+  assert.equal(fs.existsSync(path.join(destDir, 'kfm/kfm.def')), false);
+});
+
+test('a destination collision (EEXIST from the exclusive "wx" write) fails without deleting the pre-existing file', async () => {
+  const { archivePath, destDir } = await tmpDirs();
+  await fs.promises.mkdir(path.join(destDir, 'kfm'));
+  const preExistingPath = path.join(destDir, 'kfm/kfm.def');
+  await fs.promises.writeFile(preExistingPath, 'pre-existing, must survive');
+
+  const zip = await buildZip([{ name: 'kfm/kfm.def', content: 'new content' }]);
+  await fs.promises.writeFile(archivePath, zip);
+
+  await assert.rejects(() => extractArchive(archivePath, destDir));
+
+  // This attempt never created kfm/kfm.def (createWriteStream's 'wx' flag
+  // failed with EEXIST before any byte was written) -- cleanup must not
+  // delete a file it didn't create.
+  assert.equal(await fs.promises.readFile(preExistingPath, 'utf8'), 'pre-existing, must survive');
 });
 
 test('a truncated/corrupt archive fails with CorruptArchiveError, not a raw parser exception', async () => {

@@ -23,10 +23,19 @@ function buildRawZip(entries) {
   const centralParts = [];
   let offset = 0;
 
-  for (const { name, content = '', unixMode } of entries) {
+  for (const { name, content = '', unixMode, corruptPayload } of entries) {
     const nameBuf = Buffer.from(name, 'utf8');
     const dataBuf = Buffer.from(content, 'utf8');
     const crc = zlib.crc32(dataBuf);
+    // When corruptPayload is set, the header still records the CRC/size of
+    // the original (uncorrupted) data, but the bytes actually written are
+    // flipped -- same length, wrong content, exactly the "same-length
+    // corrupted payload" case CRC validation (not size validation) must
+    // catch.
+    const writtenData =
+      corruptPayload && dataBuf.length > 0
+        ? Buffer.concat([Buffer.from([dataBuf[0] ^ 0xff]), dataBuf.subarray(1)])
+        : dataBuf;
     // Unix-style external file attributes (host byte 3 == Unix), mode bits
     // in the upper 16 bits -- e.g. 0o120777 (S_IFLNK | 0777) for a symlink
     // entry whose "content" is the link target, exactly how zip tools
@@ -47,7 +56,7 @@ function buildRawZip(entries) {
     localHeader.writeUInt16LE(nameBuf.length, 26);
     localHeader.writeUInt16LE(0, 28); // extra field length
 
-    localParts.push(localHeader, nameBuf, dataBuf);
+    localParts.push(localHeader, nameBuf, writtenData);
 
     const centralHeader = Buffer.alloc(46);
     centralHeader.writeUInt32LE(0x02014b50, 0); // central dir signature
@@ -70,7 +79,7 @@ function buildRawZip(entries) {
 
     centralParts.push(centralHeader, nameBuf);
 
-    offset += localHeader.length + nameBuf.length + dataBuf.length;
+    offset += localHeader.length + nameBuf.length + writtenData.length;
   }
 
   const centralDir = Buffer.concat(centralParts);
