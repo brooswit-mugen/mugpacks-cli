@@ -5,7 +5,7 @@ const path = require('path');
 const YAML = require('yaml');
 
 const { ConfigError } = require('./errors');
-const { TYPE_INSTALL_SUBDIR, ITEM_TYPES, ID_PATTERN, URL_SCHEMES } = require('./constants');
+const { TYPE_INSTALL_SUBDIR, ITEM_TYPES, ID_PATTERN, URL_SCHEMES, CONTROL_CHAR_PATTERN } = require('./constants');
 
 function readConfigFile(configPath) {
   let raw;
@@ -118,7 +118,8 @@ function validateSubpath(id, rawSubpath) {
   const isDriveLetter = /^[A-Za-z]:/.test(rawSubpath);
   const isUnc = rawSubpath.startsWith('\\\\') || rawSubpath.startsWith('//');
   const hasBackslash = rawSubpath.includes('\\');
-  if (isAbsolutePosix || isDriveLetter || isUnc || hasBackslash) {
+  const hasControlChar = CONTROL_CHAR_PATTERN.test(rawSubpath);
+  if (isAbsolutePosix || isDriveLetter || isUnc || hasBackslash || hasControlChar) {
     throw new ConfigError(`item "${id}": ${UNSAFE_SUBPATH_MESSAGE}`);
   }
 

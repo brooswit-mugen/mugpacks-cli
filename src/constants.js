@@ -19,6 +19,11 @@ const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 const URL_SCHEMES = Object.freeze(['http:', 'https:']);
 
+// NUL and other C0 control characters are invalid in filesystem paths on
+// every target platform; reject them in `subpath` rather than letting them
+// reach a destination path.
+const CONTROL_CHAR_PATTERN = /[\x00-\x1f\x7f]/;
+
 const DEFAULT_CONFIG_FILENAME = 'mugpacks.yaml';
 
 module.exports = {
@@ -26,5 +31,6 @@ module.exports = {
   ITEM_TYPES,
   ID_PATTERN,
   URL_SCHEMES,
+  CONTROL_CHAR_PATTERN,
   DEFAULT_CONFIG_FILENAME,
 };

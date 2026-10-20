@@ -73,6 +73,23 @@ items:
   assert.equal(io.err(), 'error: item "fixture-fighter-a": type must be "char" or "stage", got "costume"\n');
 });
 
+test('install with a NUL-containing subpath exits non-zero and never prints a plan', () => {
+  const installDir = makeInstallDir();
+  const configPath = writeConfig(`
+installDir: ${installDir}
+items:
+  - id: fixture-fighter-a
+    type: char
+    url: https://example.com/fixture-fighter-a.zip
+    subpath: "bad\\u0000path"
+`);
+  const io = capture();
+  const code = run(['install', '--config', configPath], io);
+  assert.equal(code, 1);
+  assert.equal(io.out(), '');
+  assert.match(io.err(), /subpath is not a safe relative path/);
+});
+
 test('unknown command exits non-zero with a usage error', () => {
   const io = capture();
   const code = run(['bogus'], io);

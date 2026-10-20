@@ -244,6 +244,22 @@ items:
   assert.equal(plan.items[0].subpath, '');
 });
 
+test('subpath containing a NUL byte is rejected, not accepted as a valid path', () => {
+  const installDir = makeInstallDir();
+  const configPath = writeConfig(`
+installDir: ${installDir}
+items:
+  - id: fixture-fighter-a
+    type: char
+    url: https://example.com/fixture-fighter-a.zip
+    subpath: "bad\\u0000path"
+`);
+  assertConfigError(
+    () => loadConfig(configPath),
+    'item "fixture-fighter-a": subpath is not a safe relative path (no absolute paths, drive/UNC prefixes, backslashes, or ".." components)',
+  );
+});
+
 test('subpath "/" is rejected as absolute, not normalized to the root sentinel', () => {
   const installDir = makeInstallDir();
   const configPath = writeConfig(`
