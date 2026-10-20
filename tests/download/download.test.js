@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 const { downloadToFile } = require('../../src/download');
-const { DownloadError } = require('../../src/errors');
+const { DownloadError } = require('../../src/download-errors');
 
 async function withServer(handler, fn) {
   const server = http.createServer(handler);

@@ -6,7 +6,7 @@ const http = require('node:http');
 const { test } = require('node:test');
 const { buildZip } = require('../support/make-zip');
 const { fetchContent } = require('../../src/staging');
-const { DownloadError, SubpathNotFoundError } = require('../../src/errors');
+const { DownloadError, SubpathNotFoundError } = require('../../src/download-errors');
 
 async function withZipServer(zipBuffer, fn) {
   const server = http.createServer((req, res) => {

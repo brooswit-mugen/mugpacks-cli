@@ -8,7 +8,7 @@ const {
   CorruptArchiveError,
   UnsafeArchiveEntryError,
   SubpathNotFoundError,
-} = require('./errors');
+} = require('./download-errors');
 
 const FILE_MODE = 0o644;
 const DIR_MODE = 0o755;

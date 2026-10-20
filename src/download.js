@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const https = require('node:https');
 const { pipeline } = require('node:stream/promises');
-const { DownloadError } = require('./errors');
+const { DownloadError } = require('./download-errors');
 
 const MAX_REDIRECTS = 5;
 

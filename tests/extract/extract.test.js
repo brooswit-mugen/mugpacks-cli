@@ -12,7 +12,7 @@ const {
   CorruptArchiveError,
   UnsafeArchiveEntryError,
   SubpathNotFoundError,
-} = require('../../src/errors');
+} = require('../../src/download-errors');
 
 async function tmpDirs() {
   const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mugpacks-extract-test-'));
