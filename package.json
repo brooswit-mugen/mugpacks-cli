@@ -1,0 +1,19 @@
+{
+  "name": "mugpacks-cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A minimal command-line tool for installing M.U.G.E.N. characters and stages listed in a configuration file into a specified M.U.G.E.N. directory.",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test tests"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "yauzl": "^3.4.0"
+  },
+  "devDependencies": {
+    "yazl": "^3.3.1"
+  }
+}
