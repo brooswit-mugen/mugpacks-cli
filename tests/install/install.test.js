@@ -8,6 +8,7 @@ const path = require('node:path');
 const { test } = require('node:test');
 const { buildZip } = require('../support/make-zip');
 const { installItem, installPlan } = require('../../src/install');
+const { UnsafeDestinationError } = require('../../src/path-safety');
 
 async function withZipServer(routes, fn) {
   const server = http.createServer((req, res) => {
@@ -60,16 +61,16 @@ test('installItem copies the resolved content into destDir and registers it', as
       '[Info]\nname = fixture\n',
     );
     assert.equal(fs.readFileSync(path.join(destDir, 'fixture-fighter-a.sff'), 'utf8'), 'sprite-bytes');
-    assert.match(
+    assert.equal(
       fs.readFileSync(path.join(installDir, 'data', 'select.def'), 'utf8'),
-      /^\[Characters\]\nfixture-fighter-a, fixture-fighter-a\/fixture-fighter-a\.def\n$/,
+      '[Characters]\nfixture-fighter-a/fixture-fighter-a.def, random\n',
     );
   });
 });
 
 test('installItem replaces a previous install of the same id, leaving no stale files from its old shape', async () => {
-  const oldZip = await buildZip([{ name: 'stage/old-only.def', content: 'old' }]);
-  const newZip = await buildZip([{ name: 'stage/new-only.def', content: 'new' }]);
+  const oldZip = await buildZip([{ name: 'stage/fixture-stage-arena.def', content: 'old' }]);
+  const newZip = await buildZip([{ name: 'stage/fixture-stage-arena.def', content: 'new' }]);
 
   await withZipServer({ '/old.zip': oldZip, '/new.zip': newZip }, async (base) => {
     const installDir = makeInstallDir();
@@ -82,7 +83,11 @@ test('installItem replaces a previous install of the same id, leaving no stale f
       url: `${base}/old.zip`,
       destDir,
     }));
-    assert.equal(fs.existsSync(path.join(destDir, 'old-only.def')), true);
+    assert.equal(fs.readFileSync(path.join(destDir, 'fixture-stage-arena.def'), 'utf8'), 'old');
+
+    // Simulate the old content having had an extra file that the new
+    // archive version doesn't ship anymore.
+    fs.writeFileSync(path.join(destDir, 'stale-extra-file.txt'), 'leftover');
 
     await installItem(installDir, item({
       id: 'fixture-stage-arena',
@@ -92,12 +97,12 @@ test('installItem replaces a previous install of the same id, leaving no stale f
       destDir,
     }));
 
-    assert.equal(fs.existsSync(path.join(destDir, 'old-only.def')), false, 'stale file from the old shape must be gone');
-    assert.equal(fs.existsSync(path.join(destDir, 'new-only.def')), true);
+    assert.equal(fs.readFileSync(path.join(destDir, 'fixture-stage-arena.def'), 'utf8'), 'new');
+    assert.equal(fs.existsSync(path.join(destDir, 'stale-extra-file.txt')), false, 'stale file from the old shape must be gone');
 
     // Repeat install of the same id must not duplicate its select.def line.
     const selectDef = fs.readFileSync(path.join(installDir, 'data', 'select.def'), 'utf8');
-    assert.equal(selectDef.match(/^fixture-stage-arena,/gm).length, 1);
+    assert.equal(selectDef.match(/^stages\/fixture-stage-arena\//gm).length, 1);
   });
 });
 
@@ -134,9 +139,33 @@ test('installPlan continues past a failed item and reports it without touching t
       'the item that succeeded must stay installed',
     );
     assert.equal(fs.existsSync(path.join(installDir, 'chars', 'fixture-fighter-missing')), false);
-    assert.match(
+    assert.equal(
       fs.readFileSync(path.join(installDir, 'data', 'select.def'), 'utf8'),
-      /^\[Characters\]\nfixture-fighter-a,/,
+      '[Characters]\nfixture-fighter-a/fixture-fighter-a.def, random\n',
     );
+  });
+});
+
+test('refuses to install through a symlinked chars directory, and leaves its outside target untouched', async () => {
+  const zip = await buildZip([{ name: 'fighter/fighter.def', content: 'malicious payload' }]);
+
+  await withZipServer({ '/a.zip': zip }, async (base) => {
+    const installDir = makeInstallDir();
+    const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mugpacks-install-outside-'));
+    fs.writeFileSync(path.join(outsideDir, 'precious.txt'), 'do not touch');
+    // installDir/chars itself is a symlink to a sibling directory outside installDir.
+    fs.symlinkSync(outsideDir, path.join(installDir, 'chars'), 'dir');
+
+    const destDir = path.join(installDir, 'chars', 'fighter');
+    await assert.rejects(
+      () => installItem(installDir, item({ id: 'fighter', subpath: 'fighter/', url: `${base}/a.zip`, destDir })),
+      (err) => {
+        assert.ok(err instanceof UnsafeDestinationError);
+        return true;
+      },
+    );
+
+    assert.equal(fs.readFileSync(path.join(outsideDir, 'precious.txt'), 'utf8'), 'do not touch', 'the outside file must survive untouched');
+    assert.equal(fs.existsSync(path.join(outsideDir, 'fighter')), false, 'nothing must have been written through the symlink');
   });
 });

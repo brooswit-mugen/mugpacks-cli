@@ -100,11 +100,13 @@ test('installs two characters and two stages, preserves pre-existing content, an
     );
 
     const selectDefAfterFirstRun = fs.readFileSync(path.join(installDir, 'data', 'select.def'), 'utf8');
+    // Pre-existing content preserved byte-for-byte, typo and all -- not a
+    // syntax this module imitates for the new lines it adds below.
     assert.match(selectDefAfterFirstRun, /^preexisting-char, preexisting-char\/preexisting-char\.def$/m);
-    assert.match(selectDefAfterFirstRun, /^fixture-fighter-a, fixture-fighter-a\/fixture-fighter-a\.def$/m);
-    assert.match(selectDefAfterFirstRun, /^fixture-fighter-b, fixture-fighter-b\/fixture-fighter-b\.def$/m);
-    assert.match(selectDefAfterFirstRun, /^fixture-stage-dojo, fixture-stage-dojo\/fixture-stage-dojo\.def$/m);
-    assert.match(selectDefAfterFirstRun, /^fixture-stage-arena, fixture-stage-arena\/fixture-stage-arena\.def$/m);
+    assert.match(selectDefAfterFirstRun, /^fixture-fighter-a\/fixture-fighter-a\.def, random$/m);
+    assert.match(selectDefAfterFirstRun, /^fixture-fighter-b\/fixture-fighter-b\.def, random$/m);
+    assert.match(selectDefAfterFirstRun, /^stages\/fixture-stage-dojo\/fixture-stage-dojo\.def$/m);
+    assert.match(selectDefAfterFirstRun, /^stages\/fixture-stage-arena\/fixture-stage-arena\.def$/m);
 
     const secondRun = capture();
     const secondCode = await run(['install', '--config', configPath], secondRun);
@@ -154,7 +156,7 @@ test('one item failing at the download stage reports that item and does not bloc
     );
     assert.match(
       fs.readFileSync(path.join(installDir, 'data', 'select.def'), 'utf8'),
-      /^fixture-fighter-a, fixture-fighter-a\/fixture-fighter-a\.def$/m,
+      /^fixture-fighter-a\/fixture-fighter-a\.def, random$/m,
     );
   });
 });

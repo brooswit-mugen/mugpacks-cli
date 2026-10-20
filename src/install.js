@@ -4,16 +4,21 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { fetchContent } = require('./staging');
 const { registerSelections } = require('./registry');
-
-const SELECT_DEF_RELATIVE_PATH = path.join('data', 'select.def');
+const { assertNoSymlinkAncestors } = require('./path-safety');
 
 // Replaces `destDir` with a fresh copy of `srcDir`'s contents. Removing
 // destDir first (rather than merging into it) is what keeps a repeat
 // install from leaving stale files behind when the same id's archive
 // changed shape between runs. destDir's parent (installDir/chars or
 // installDir/stages) is created on demand for a type installed for the
-// first time.
-async function replaceInstalledContent(srcDir, destDir) {
+// first time. `installDir` is the trusted root this destination must stay
+// inside; every component between it and destDir (destDir included) is
+// checked for a symlink before anything is created, removed, or copied,
+// so a symlink planted at e.g. installDir/chars (redirecting it to an
+// unrelated directory) can never cause this to mkdir/rm/cp outside
+// installDir.
+async function replaceInstalledContent(installDir, srcDir, destDir) {
+  await assertNoSymlinkAncestors(installDir, destDir);
   await fs.promises.mkdir(path.dirname(destDir), { recursive: true });
   await fs.promises.rm(destDir, { recursive: true, force: true });
   await fs.promises.cp(srcDir, destDir, { recursive: true });
@@ -28,11 +33,11 @@ async function replaceInstalledContent(srcDir, destDir) {
 async function installItem(installDir, item) {
   const { contentPath, cleanup } = await fetchContent(item.url, item.subpath);
   try {
-    await replaceInstalledContent(contentPath, item.destDir);
+    await replaceInstalledContent(installDir, contentPath, item.destDir);
   } finally {
     await cleanup();
   }
-  registerSelections(path.join(installDir, SELECT_DEF_RELATIVE_PATH), [item]);
+  await registerSelections(installDir, [item]);
 }
 
 // Installs every item in a normalized plan. Each item is attempted

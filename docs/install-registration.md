@@ -17,11 +17,18 @@ download/extraction (`src/{download,extract,staging}.js`).
     failure does not stop, skip, or roll back any other item. Returns
     `[{ id, error }, ...]` for the items that failed; an empty array means
     every item installed and registered.
-- `src/registry.js` -- `registerSelections(selectDefPath, items)`: adds
+- `src/registry.js` -- `registerSelections(installDir, items)`: adds
   exactly one `[Characters]` line per `char` item and one `[ExtraStages]`
-  line per `stage` item to `select.def`, without disturbing any other line
-  already there. Idempotent: registering the same items again is a no-op,
-  which is what keeps a repeat `mugpacks install` from duplicating lines.
+  line per `stage` item to `installDir/data/select.def`, without
+  disturbing any other line already there. Idempotent: registering the
+  same items again is a no-op, which is what keeps a repeat
+  `mugpacks install` from duplicating lines.
+- `src/path-safety.js` -- `assertNoSymlinkAncestors(baseDir, targetPath)`:
+  rejects a destructive write at `targetPath` if any component between
+  `baseDir` and `targetPath` (inclusive) is a symlink, so neither
+  `installDir/{chars,stages}/<id>` nor `installDir/data/select.def` can be
+  redirected outside `installDir` by a symlink planted at any point along
+  the way.
 
 ## Contract notes
 
@@ -40,10 +47,20 @@ download/extraction (`src/{download,extract,staging}.js`).
   before copying the newly staged content in, so a repeat install never
   leaves stale files behind from an older, differently-shaped version of
   the same item.
-- **`select.def` line format.** The MUGEN-5/MUGEN-9 contract specifies that
-  exactly one line is added per item, in the right section, idempotently --
-  it does not specify the exact per-field syntax beyond that. This mirrors
-  the one concrete example in the fixtures
-  (`fixture/mugen-root/data/select.def`'s pre-existing
-  `preexisting-char, preexisting-char/preexisting-char.def` line):
-  `<id>, <id>/<id>.def`, for both `[Characters]` and `[ExtraStages]` entries.
+- **`select.def` line format.** Follows the real engine syntax documented
+  in the distributed `select.def`'s own comments (e.g.
+  https://raw.githubusercontent.com/fanyer/mugen/master/data/select.def):
+  a `[Characters]` line is `<id>/<def-file>, <stagefilename-or-"random">`
+  (this CLI has no per-item stage assignment in its config contract, so it
+  always uses `random`, which the engine's own docs call out as a valid
+  value); an `[ExtraStages]` line is just the stage's path on its own,
+  `stages/<id>/<def-file>`, with no name field at all. `<def-file>` is
+  resolved by reading the actual installed directory for its one
+  top-level `.def` file (`registry.js`'s `resolveDefFile`) rather than
+  assumed to be `<id>.def` -- an installed archive's content is not
+  guaranteed to name its def file after the config's `id`.
+  `fixtures/mugen-root/data/select.def`'s pre-existing
+  `preexisting-char, preexisting-char/preexisting-char.def` line predates
+  this and does not follow it (its second field is a char-relative def
+  path, not a stage); that line is pre-existing content and is preserved
+  byte-for-byte, not a syntax this module imitates for new entries.
